@@ -1,16 +1,16 @@
-# 现在华为官方主推的 MindIE (MindSpore Inference Engine) 结合 ATB 算子库，已经原生支持直接加载 HuggingFace 格式的权重，这极大简化了部署流程。
-# bg：MindIE（MindSpore Inference Engine）是华为专门为大模型部署打造的高性能引擎，可以把它理解为昇腾版的 vLLM 或 TensorRT-LLM。它底层集成了 ATB（Ascend Tensor Boost）算子加速库，现在的版本已经可以做到“免转换”，直接读取 HuggingFace 上的 .safetensors 权重文件。自带顶级加速度：这是追求优化的关键。MindIE 内部原生实现了PagedAttention： 极大缓解显存碎片化，提升并发量。Continuous Batching： 提升高并发场景下的吞吐量和FlashAttention： 针对 910A 底层架构优化过的高效注意力算子，加速生成速度。
-# 服务器基础检查与 NPU 验证
-## 登录远程服务器
+## 现在华为官方主推的 MindIE (MindSpore Inference Engine) 结合 ATB 算子库，已经原生支持直接加载 HuggingFace 格式的权重，这极大简化了部署流程。
+## bg：MindIE（MindSpore Inference Engine）是华为专门为大模型部署打造的高性能引擎，可以把它理解为昇腾版的 vLLM 或 TensorRT-LLM。它底层集成了 ATB（Ascend Tensor Boost）算子加速库，现在的版本已经可以做到“免转换”，直接读取 HuggingFace 上的 .safetensors 权重文件。自带顶级加速度：这是追求优化的关键。MindIE 内部原生实现了PagedAttention： 极大缓解显存碎片化，提升并发量。Continuous Batching： 提升高并发场景下的吞吐量和FlashAttention： 针对 910A 底层架构优化过的高效注意力算子，加速生成速度。
+## 服务器基础检查与 NPU 验证
+### 登录远程服务器
 确认环境：
 登录命令   ssh root@服务器ip -p 端口
-## 找回历史命令
+### 找回历史命令
     history | grep -E "docker|npu-smi|huggingface|wget"
-## 发现
-## 登录远程服务器后，第一步是确认昇腾 910A 芯片的驱动和固件状态。
+### 发现
+### 登录远程服务器后，第一步是确认昇腾 910A 芯片的驱动和固件状态。
 1. 这相当于 NVIDIA 的 nvidia-smi，是昇腾生态中最基础的命令。
 命令行：npu-smi info
-### 关键看点：
+#### 关键看点：
     Card / Device: 确认有几张卡（通常标号为 0, 1, 2...）。
     Health: 必须是 OK。
     Memory-Usage: 查看显存占用，确保有空闲显存（910A 通常为 32G 显存版本）。
@@ -18,7 +18,7 @@
 确认磁盘空间足够，大模型及其容器镜像通常需要数百 GB 空间。
     arch       # 确认架构，通常是 aarch64 或 x86_64
     df -h      # 检查磁盘空间，找一个空间最大的目录用来存模型
-# 启动昇腾专属 Docker 容器
+## 启动昇腾专属 Docker 容器
 昇腾环境的依赖非常复杂（包含 CANNToolkit、驱动库等），建议使用官方镜像，不要在宿主机上强行编译。我们需要挂载昇腾的 NPU 设备节点（/dev/davinci*）和宿主机驱动。
 1. 拉取 MindIE 镜像
 前往华为云 SWR 或昇腾社区获取最新的 MindIE 镜像（这里以通用标签为例）：
@@ -46,14 +46,14 @@ docker run -it -d \
     --shm-size=500g: 扩大共享内存，大模型推理时卡间通信（如 NCCL/HCCL）极度依赖内存。
 进入容器：
     docker exec -it ascend_llm bash
-# 模型下载与格式准备（HuggingFace -> 昇腾）
+## 模型下载与格式准备（HuggingFace -> 昇腾）
 因为是用来推理部署并优化速度，可以直接选用MindIE直接加载。MindIE 可以直接读取标准 HuggingFace 的模型文件夹。
 1. 下载 HuggingFace 模型
 如果是国内服务器，建议使用模型库镜像下载（以Qwen为例）：
 pip install -U huggingface_hub
 huggingface-cli download --resume-download Qwen/Qwen3.5-9B-Instruct --local-dir /workspace/models/Qwen2.5-7B-Instruct
 确保下载下来的文件夹中包含 .safetensors 和 config.json。这就是昇腾需要的最终格式了。
-# 配置并启动 MindIE 推理服务
+## 配置并启动 MindIE 推理服务
 现在我们使用昇腾的高性能推理引擎 MindIE 来启动服务。
 1. 修改配置文件
 找到 MindIE 的服务配置文件（通常位于容器内的 /usr/local/Ascend/mindie/latest/mindieservice_daemon/conf/config.json）。
@@ -90,7 +90,7 @@ worldSize: 必须与你分配的卡数保持一致。
 查看日志确认模型是否成功加载到 NPU：
     tail -f output.log
 当看到类似 Daemon start success 或 Server is listening on 0.0.0.0:1040 时，说明昇腾 NPU 已经成功吃下了你的大模型。
-# 测试调用
+## 测试调用
 MindIE-Service 提供与 OpenAI 兼容的 API 接口。我们可以直接用 Linux 基础命令 curl 来测试 910A 的推理效果。
     curl -X POST http://127.0.0.1:1040/v1/chat/completions \
     -H "Content-Type: application/json" \
