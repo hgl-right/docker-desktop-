@@ -2,11 +2,8 @@
 # bg：MindIE（MindSpore Inference Engine）是华为专门为大模型部署打造的高性能引擎，可以把它理解为昇腾版的 vLLM 或 TensorRT-LLM。它底层集成了 ATB（Ascend Tensor Boost）算子加速库，现在的版本已经可以做到“免转换”，直接读取 HuggingFace 上的 .safetensors 权重文件。自带顶级加速度：这是追求优化的关键。MindIE 内部原生实现了PagedAttention： 极大缓解显存碎片化，提升并发量。Continuous Batching： 提升高并发场景下的吞吐量和FlashAttention： 针对 910A 底层架构优化过的高效注意力算子，加速生成速度。
 # 服务器基础检查与 NPU 验证
 ## 登录远程服务器
-    环境：
-    119.6.186.139
-    User root
-    Port 10263
-登录命令   ssh root@119.6.186.139 -p 10263
+确认环境：
+登录命令   ssh root@服务器ip -p 端口
 ## 找回历史命令
     history | grep -E "docker|npu-smi|huggingface|wget"
 ## 发现
@@ -109,4 +106,3 @@ MindIE-Service 提供与 OpenAI 兼容的 API 接口。我们可以直接用 Lin
     "stream": true
     }'
 如果终端开始源源不断地吐出中文字符和代码，恭喜你，你已经成功在昇腾 910A 上跑通了大模型的推理全流程。
-# 
